@@ -6,7 +6,7 @@ import copy from "rollup-plugin-copy-watch";
 export default {
     input: "scripts/isolated.ts",
     output: {
-        dir: "dist/scripts",
+        dir: "dist",
         format: "iife",
         inlineDynamicImports: true
     },

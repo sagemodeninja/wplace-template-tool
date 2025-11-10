@@ -1,0 +1,60 @@
+tool-panel {
+    #menu {
+        border-radius: 24px;
+        flex-wrap: nowrap;
+        max-height: 80%;
+
+        &:not([visible]),
+        #upload-template {
+            display: none;
+        }
+
+        #temp-colors {
+            overflow-y: auto;
+
+            .tc-row {
+                align-items: center;
+                display: grid;
+                gap: 8px;
+                grid-template-columns: 24px 1fr 120px;
+
+                .tc-col {
+                    align-items: center;
+                    display: flex;
+                    gap: 8px;
+
+                    .tc-toggle {
+                        color: var(--color-primary);
+                    }
+                }
+
+                &:not(.enabled) {
+                    opacity: 0.5;
+
+                    .tc-toggle {
+                        color: oklab(0.41886 -0.0129798 -0.051386 / 0.8);
+                    }
+                }
+
+                .tc-col.px-cnt {
+                    justify-content: end;
+                }
+            }
+
+            .temp-color {
+                align-items: center;
+
+                .color-sm {
+                    --size: calc(var(--size-field, 0.25rem) * 6);
+                    border-width: var(--border);
+                    height: var(--size);
+                    width: 24px;
+                }
+            }
+        }
+    }
+}
+
+focus-toggle button.enabled {
+    color: var(--color-primary);
+}

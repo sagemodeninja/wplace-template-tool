@@ -7,13 +7,13 @@ attachIsolated(window);
 const inject = () => {
     // Spy
     const script = document.createElement("script");
-    script.src = chrome.runtime.getURL("scripts/inline.js");
+    script.src = chrome.runtime.getURL("inline.js");
     document.documentElement.appendChild(script);
     script.remove();
 
     // Styles
     const style = document.createElement("link");
-    style.href = chrome.runtime.getURL("static/styles/index.css");
+    style.href = chrome.runtime.getURL("styles.css");
     style.rel = "stylesheet";
     document.documentElement.appendChild(style);
 };
@@ -21,10 +21,17 @@ const inject = () => {
 inject();
 
 let isHoming = false;
+let isFocusing = false;
 let template: Template | undefined;
+let colors = new Set<string>();
+
+(async () => {
+    const value = await getValue("focus-enabled");
+    isFocusing = value === "true";
+})();
 
 // Fetch templates...
-(async () => {
+const updateTemplate = async () => {
     const active = await getValue("active-template");
 
     if (!active) return;
@@ -33,7 +40,29 @@ let template: Template | undefined;
     const tmp8 = templates ? JSON.parse(templates) as Template[] : [];
 
     template = tmp8.find(t => t.id === active);
-})();
+
+    // Update color cache...
+    colors.clear();
+    for (const color of template.colors) {
+        if (color.enabled) colors.add(color.key);
+    }
+}
+
+updateTemplate();
+
+const handleCommands = (message: CommandMessage) => {
+    switch (message.command) {
+        case "toggle-homing":
+            isHoming = message.data;
+            break;
+        case "toggle-focus":
+            isFocusing = message.data;
+            break;
+        case "update-template":
+            updateTemplate();
+            break;
+    }
+};
 
 const handleInterceptedJson = async (message: InterceptedJsonMessage) => {
     const { endpoint } = message;
@@ -121,6 +150,7 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
 
     const bitmap = await createImageBitmap(blob!);
     const { width, height } = bitmap;
+    const { width: bwidth, height: bheight } = template.bounds;
     const drawSize = width * 3;
 
     const canvas = new OffscreenCanvas(drawSize, drawSize);
@@ -133,50 +163,27 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
     context.rect(0, 0, drawSize, drawSize);
     context.clip();
 
-    const tcanvas = new OffscreenCanvas(width, height);
-    const tcontext = tcanvas.getContext("2d", { willReadFrequently: true });
 
-    if (!tcontext) return;
+    const realCanvas = new OffscreenCanvas(tileSize, tileSize);
+    const realContext = realCanvas.getContext("2d", { willReadFrequently: true });
 
-    tcontext.drawImage(bitmap, 0, 0, width, height);
+    if (!realContext) return;
 
+    realContext.imageSmoothingEnabled = false; // Nearest neighbor
+
+    context.drawImage(bitmap, 0, 0, drawSize, drawSize);
+    realContext.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
 
-    const imageData = tcontext.getImageData(0, 0, width, height);
-    const pixels = imageData!.data!;
+    const imageData = realContext.getImageData(0, 0, width, height);
+    const realPixels = imageData!.data!;
 
-    context.drawImage(tcanvas, 0, 0, drawSize, drawSize);
-
-    // for (var y = 1; y < height; y += 3) {
-    //     for (var x = 1; x < width; x += 3) {
-    //         (context!).fillStyle = `#000`;
-    //         context?.fillRect(x, y, 1, 1);
-    //     }
-    // }
-
-    // for (var y = 0; y < height; y++) {
-    //     for (var x = 0; x < width; x++) {
-    //         const i = (y * width + x) * 4;
-
-    //         const r = pixels[i];
-    //         const g = pixels[i + 1];
-    //         const b = pixels[i + 2];
-    //         const a = 0.2;
-
-    //         const ox = x * 3;
-    //         const oy = y * 3;
-
-    //         context.clearRect(ox, oy, 3, 3);
-    //         context.fillStyle = `rgba(${r},${g},${b},${a})`;
-    //         context.fillRect(ox, oy, 3, 3);
-    //     }
-    // }
-
-    const { width: bwidth, height: bheight } = template.bounds;
     const tempCanvas = new OffscreenCanvas(bwidth, bheight);
     const tempContext = tempCanvas.getContext("2d", { willFrequentlyRead: true });
 
     if (!tempContext) return;
+
+    tempContext.imageSmoothingEnabled = false; // Nearest neighbor
 
     const img = await new Promise<HTMLImageElement>(resolve => {
         const img = new Image();
@@ -191,17 +198,41 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
     const offsetX = gTempX >= gTileX ? origin.x : gTempX - gTileX;
     const offsetY = gTempY >= gTileY ? origin.y : gTempY - gTileY;
 
+    // Render centered guides...
     for (var y = 0; y < bheight; y++) {
         for (var x = 0; x < bwidth; x++) {
-            const i = (y * bwidth + x) * 4;
-            const r = tempPixels[i];
-            const g = tempPixels[i + 1];
-            const b = tempPixels[i + 2];
+            const ti = (y * bwidth + x) * 4;
+            const tr = tempPixels[ti];
+            const tg = tempPixels[ti + 1];
+            const tb = tempPixels[ti + 2];
+            const tkey = `${tr}_${tg}_${tb}`;
 
-            context.fillStyle = `rgba(${r},${g},${b},1)`;
-            context.fillRect(((offsetX + x) * 3) + 1, ((offsetY + y) * 3) + 1, 1, 1);
+            const ri = (((y + offsetY) * tileSize) + (x + offsetX)) * 4;
+            const rr = realPixels[ri];
+            const rg = realPixels[ri + 1];
+            const rb = realPixels[ri + 2];
+            const rkey = `${rr}_${rg}_${rb}`;
+
+            const gx = (x + offsetX) * 3;
+            const gy = (y + offsetY) * 3;
+
+            // Color is filtered off.
+            if (colors.has(tkey)) {
+                if (isFocusing && rkey === tkey) {
+                    context.clearRect(gx, gy, 3, 3);
+
+                    context.fillStyle = `rgba(${rr},${rg},${rb},0.05)`;
+                    context.fillRect(gx, gy, 3, 3);
+                } else {
+                    context.fillStyle = `rgba(${tr},${tg},${tb},1)`;
+                    context.fillRect(gx + 1, gy + 1, 1, 1);
+                }
+            }
         }
     }
+
+    // context.strokeStyle = "black";
+    // context.strokeRect(offsetX * 3, offsetY * 3, bwidth * 3, bheight * 3);
 
     const b = await canvas.convertToBlob({ type: "image/png" });
 
@@ -213,21 +244,14 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
     });
 };
 
-const handleCommands = (message: CommandMessage) => {
-    switch (message.command) {
-        case "toggle-homing":
-            isHoming = message.data;
-            break;
-    }
-};
-
 // Processing...
-messages.listenIsolated("*", async message => {
+messages.listenToIsolated("*", async message => {
     switch (message.type) {
         case "intercepted-json":
             return handleInterceptedJson(message as InterceptedJsonMessage);
         case "intercepted-blob":
-            return handleInterceptedBlob(message as InterceptedBlobMessage);
+            handleInterceptedBlob(message as InterceptedBlobMessage);
+            break;
         case "command":
             return handleCommands(message as CommandMessage);
     }
@@ -240,3 +264,20 @@ messages.listenIsolated("*", async message => {
 
     sidebar.appendChild(document.createElement("tool-panel"));
 })();
+
+
+document.addEventListener("click", (e) => {
+    const toolbar = document.querySelector("#map ~ .bottom-0 > div > div > .flex > .flex");
+
+    if (toolbar && !toolbar.querySelector("focus-toggle"))
+        toolbar.appendChild(document.createElement("focus-toggle"));
+
+    const swatches = document.querySelectorAll("#map ~ .bottom-0 > div > div > .mb-4 > div > div > button");
+
+    for (const swatch of swatches) {
+        if (swatch.innerHTML !== "<!---->") {
+            const id = swatch.id.replace("color-", "");
+            console.log(id);
+        }
+    }
+});

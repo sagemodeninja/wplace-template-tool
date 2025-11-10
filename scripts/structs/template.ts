@@ -3,6 +3,7 @@ import { Rect } from "./rect";
 
 export interface TemplateColor {
     id: number,
+    key: string,
     count: number,
     enabled: boolean
 }
