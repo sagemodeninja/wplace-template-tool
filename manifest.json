@@ -1,0 +1,23 @@
+{
+    "name": "Wplace Template Tool",
+    "description": "Wplace Template Tool",
+    "version": "1.0",
+    "manifest_version": 3,
+    "action": {
+        "default_popup": "static/popup.html",
+        "default_icon": "static/images/icons/icon.png"
+    },
+    "content_scripts": [
+        {
+            "js": ["scripts/isolated.js"],
+            "matches": ["https://wplace.live/*"]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["scripts/inline.js", "static/styles/index.css"],
+            "matches": ["https://wplace.live/*"]
+        }
+    ],
+    "permissions": ["storage"]
+}

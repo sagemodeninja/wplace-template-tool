@@ -1,0 +1,25 @@
+{
+    "name": "wplace-template-tool",
+    "version": "0.1.0",
+    "description": "WPlace Super Tool",
+    "scripts": {
+        "dev": "npm run dev:inline & npm run dev:isolated",
+        "dev:inline": "rollup -c rollup.inline.config.js -w",
+        "dev:isolated": "rollup -c rollup.isolated.config.js -w",
+        "build": "rollup -c"
+    },
+    "devDependencies": {
+        "@rollup/plugin-node-resolve": "^16.0.3",
+        "@rollup/plugin-terser": "^0.4.4",
+        "@rollup/plugin-typescript": "^12.3.0",
+        "@types/chrome": "^0.1.27",
+        "rollup": "^4.53.1",
+        "rollup-plugin-copy": "^3.5.0",
+        "tslib": "^2.8.1"
+    },
+    "dependencies": {
+        "@floating-ui/dom": "^1.7.4",
+        "lit": "^3.3.1",
+        "rollup-plugin-copy-watch": "^0.0.1"
+    }
+}

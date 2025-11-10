@@ -1,0 +1,28 @@
+tool-panel #menu {
+    border-radius: 24px;
+    flex-wrap: nowrap;
+    max-height: 80%;
+}
+
+tool-panel #menu:not([visible]) {
+    display: none;
+}
+
+tool-panel #menu #upload-template {
+    display: none;
+}
+
+tool-panel #temp-colors {
+    overflow-y: auto;
+}
+
+tool-panel .temp-colors {
+    align-items: center;
+}
+
+tool-panel .color-sm {
+    --size: calc(var(--size-field, 0.25rem) * 6);
+    border-width: var(--border);
+    height: var(--size);
+    width: var(--size);
+}
