@@ -1,12 +1,15 @@
 {
     "name": "wplace-template-tool",
     "version": "0.1.0",
+    "type": "module",
     "description": "WPlace Super Tool",
     "scripts": {
         "dev": "npm run dev:inline & npm run dev:isolated",
+        "build": "npm run build:inline && npm run build:isolated",
         "dev:inline": "rollup -c rollup.inline.config.js -w",
         "dev:isolated": "rollup -c rollup.isolated.config.js -w",
-        "build": "rollup -c"
+        "build:inline": "rollup -c rollup.inline.config.js",
+        "build:isolated": "rollup -c rollup.isolated.config.js"
     },
     "devDependencies": {
         "@rollup/plugin-alias": "^6.0.0",
