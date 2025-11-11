@@ -1,3 +1,4 @@
+import alias from "@rollup/plugin-alias";
 import resolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
 import scss from "rollup-plugin-scss";
@@ -12,7 +13,14 @@ export default {
         assetFileNames: "[name][extname]"
     },
     plugins: [
-        resolve(),
+        alias({
+            entries: [
+                { find: "@", replacement: "scripts" }
+            ]
+        }),
+        resolve({
+            extensions: [".js", ".ts"]
+        }),
         typescript(),
         scss({
             output: "dist/styles/",

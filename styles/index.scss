@@ -18,6 +18,12 @@ tool-panel {
                 gap: 8px;
                 grid-template-columns: 24px 1fr 120px;
 
+                &.tc-header span {
+                    font-size: 0.875rem;
+                    font-weight: 700;
+                    line-height: 1;
+                }
+
                 .tc-col {
                     align-items: center;
                     display: flex;

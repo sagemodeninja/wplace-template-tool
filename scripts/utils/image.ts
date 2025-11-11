@@ -16,3 +16,8 @@ export const createImage = (src: string) => {
         img.src = src;
     });
 }
+
+export const image = {
+    getData: getImageData,
+    create: createImage
+};

@@ -1,18 +1,22 @@
-import { Origin } from "./origin";
-import { Rect } from "./rect";
+import { TemplateBounds } from "@/structs/bounds";
 
 export interface TemplateColor {
     id: number,
     key: string,
     count: number,
+    painted: number,
+    mistake: number,
     enabled: boolean
+}
+
+export interface TemplateTile {
+    data: string,
 }
 
 export interface Template {
     id: string,
     filename: string,
-    origin: Origin,
-    bounds: Rect,
-    data: string,
-    colors: TemplateColor[]
+    bounds: TemplateBounds,
+    tiles: Record<string, TemplateTile>,
+    colors: TemplateColor[],
 }

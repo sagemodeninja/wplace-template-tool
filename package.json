@@ -9,6 +9,7 @@
         "build": "rollup -c"
     },
     "devDependencies": {
+        "@rollup/plugin-alias": "^6.0.0",
         "@rollup/plugin-node-resolve": "^16.0.3",
         "@rollup/plugin-terser": "^0.4.4",
         "@rollup/plugin-typescript": "^12.3.0",

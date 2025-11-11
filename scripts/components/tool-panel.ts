@@ -3,10 +3,9 @@ import { customElement, query, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { classMap } from "lit/directives/class-map.js";
 import { computePosition, offset, flip, shift } from "@floating-ui/dom";
-import { CommandMessage, Origin, Template, TemplateColor } from "../structs";
-import { getValueFromInline, setValueFromInline } from "../utils/storage";
-import { createImage, getImageData, color, colors, numbers } from "../utils";
-import { messages } from "../utils/messages";
+import { CommandMessage, Template, TemplateColor, Origin } from "@/structs";
+import { getValueFromInline, setValueFromInline } from "@/utils/storage";
+import { colors, numbers, messages, createTemplate } from "@/utils";
 
 @customElement("tool-panel")
 export class ToolPanel extends LitElement {
@@ -71,7 +70,7 @@ export class ToolPanel extends LitElement {
                     </label>
                 </div>
                 <div id="temp-colors" class="flex flex-col gap-3">
-                    <div class="tc-row ${classMap({ enabled: this._allColorsEnabled })}">
+                    <div class="tc-row tc-header text-base-content/80 ${classMap({ enabled: this._allColorsEnabled })}">
                         <div class="tc-col">
                             <button class="tc-toggle btn btn-circle btn-ghost text-base-content/80 size-6" @click=${this.toggleAllColor.bind(this)}>
                                 ${this._allColorsEnabled ? html`
@@ -92,9 +91,6 @@ export class ToolPanel extends LitElement {
                         </div>
                     </div>
                     ${repeat(this._template?.colors ?? [], c => c.id, this.renderTemplateColor.bind(this))}
-                </div>
-                <div>
-                    <focus-toggle></focus-toggle>
                 </div>
             </div>
         `;
@@ -190,48 +186,14 @@ export class ToolPanel extends LitElement {
 
         if (!files || files.length === 0) return;
 
-        const id = crypto.randomUUID();
-        const file = files[0];
-
-        const data = await this.fileToDataURL(file);
-        const image = await createImage(data);
-
-        const { width, height } = image;
-        const { data: pixels } = getImageData(image);
-
-        const unsorted = new Map<string, number>();
-
-        for (var i = 0; i < pixels.length; i += 4) {
-            const key = `${pixels[i]}_${pixels[i + 1]}_${pixels[i + 2]}`;
-            unsorted.set(key, (unsorted.get(key) ?? 0) + 1);
-        }
-
-        const colors = [...unsorted.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([key, count]) => ({
-                id: color.indexOf(key),
-                key,
-                count,
-                enabled: true,
-            }) as TemplateColor);
-
-        // Update templates...
-        const { x, y } = this._origin!;
-        const template = {
-            id,
-            origin: this._origin!,
-            bounds: { width, height, x, y },
-            filename: file.name,
-            colors,
-            data,
-        };
+        const template = await createTemplate(files[0], this._origin);
 
         this._templates.push(template);
         await setValueFromInline("templates", JSON.stringify(this._templates));
 
         // Update active template.
         this._template = template;
-        await setValueFromInline("active-template", id);
+        await setValueFromInline("active-template", template.id);
     }
 
     private async toggleAllColor() {
@@ -259,15 +221,6 @@ export class ToolPanel extends LitElement {
         this.requestUpdate("_template");
         messages.sendToIsolated("command", {
             command: "update-template"
-        });
-    }
-
-    private fileToDataURL(file: File) {
-        return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
         });
     }
 

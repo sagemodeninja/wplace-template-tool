@@ -1,3 +1,4 @@
+import alias from "@rollup/plugin-alias";
 import resolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
 import terser from "@rollup/plugin-terser";
@@ -11,7 +12,14 @@ export default {
         inlineDynamicImports: true
     },
     plugins: [
-        resolve(),
+        alias({
+            entries: [
+                { find: "@", replacement: "scripts" }
+            ]
+        }),
+        resolve({
+            extensions: [".js", ".ts"]
+        }),
         typescript(),
         copy({
             watch: ["manifest.json", "static/styles"],
