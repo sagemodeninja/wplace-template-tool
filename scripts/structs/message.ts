@@ -9,7 +9,7 @@ export interface ToolMessage {
 export interface CommandMessage extends ToolMessage {
     type: "command",
     command: string,
-    data: any,
+    data?: any,
 }
 
 export interface InterceptedJsonMessage extends ToolMessage {

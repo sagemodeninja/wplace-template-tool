@@ -23,13 +23,23 @@ const inject = () => {
 
 inject();
 
+interface PixelStats {
+    painted: number;
+    mistake: number;
+}
+
+interface StatefulTemplateTile {
+    data: string,
+    pixels: Map<string, PixelStats>, // <color, stats>
+}
+
 let isHoming = false;
 let isFocusing = false;
 let templates: Template[];
 let template: Template | undefined;
 let colorStatuses = new Set<string>();
 let indexedColors = new Map<string, TemplateColor>();
-let tiles = new Map<string, TemplateTile>();
+let tiles = new Map<string, StatefulTemplateTile>();
 
 (async () => {
     const value = await getValue("focus-enabled");
@@ -48,19 +58,18 @@ const updateTemplate = async () => {
     template = templates.find(t => t.id === active);
 
     // Cache tiles...
-    tiles = new Map(Object.entries(template.tiles));
+    // FIXME: Complicated and perhaps inefficient!
+    tiles = new Map(Object.entries(template.tiles).map(([k, t]) => [k, { data: t.data, pixels: new Map() }]));
 
     // Update color cache...
     colorStatuses.clear();
     indexedColors.clear();
 
     for (const color of template.colors) {
-        // Indexing
-        indexedColors.set(color.key, {
-            ...color,
-            painted: 0, // Reset stats...
-            mistake: 0
-        });
+        // Indexing for stats
+        color.painted = 0; // Reset...
+        color.mistake = 0;
+        indexedColors.set(color.key, color);
 
         // Status
         if (color.enabled)
@@ -69,6 +78,40 @@ const updateTemplate = async () => {
 }
 
 updateTemplate();
+
+let statsDebounce: number;
+const updateColorStats = async () => {
+    window.clearTimeout(statsDebounce);
+    statsDebounce = window.setTimeout(async () => {
+        statsDebounce = undefined;
+
+        // This is not efficient!
+        const colors = new Map<string, TemplateColor>();
+        for (const color of template.colors) {
+            // Reset all stats...
+            color.painted = 0;
+            color.mistake = 0;
+
+            colors.set(color.key, color);
+        }
+
+        tiles.forEach(tile => {
+            for (const [key, stats] of tile.pixels) {
+                const color = colors.get(key);
+                color.painted += stats.painted;
+                color.mistake += stats.mistake;
+            }
+        });
+
+        // Save stats...
+        await setValue("templates", JSON.stringify(templates));
+
+        // Notify panel...
+        messages.sendToInline<CommandMessage>("command", {
+            command: "update-stats"
+        });
+    }, 200);
+}
 
 const handleCommands = (message: CommandMessage) => {
     switch (message.command) {
@@ -209,6 +252,8 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
         const endX = Math.min(TILE_SIZE, gox + width - gctx);
         const endY = Math.min(TILE_SIZE, goy + height - gcty);
 
+        tile.pixels.clear(); // Clear pixel stats...
+
         // Render template...
         for (var y = startY; y < endY; y++) {
             for (var x = startX; x < endX; x++) {
@@ -227,38 +272,48 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
                 const gx = x * SIZE_MULT;
                 const gy = y * SIZE_MULT;
 
-                const pixelsMatch = rkey === tkey;
+                const painted = ra !== 0;
+                const correct = rkey === tkey;
+                const active = colorStatuses.has(tkey);
 
-                // Color is filtered off.
-                if (colorStatuses.has(tkey)) {
-                    if (isFocusing && pixelsMatch) {
-                        context.clearRect(gx, gy, 3, 3);
+                if (isFocusing && (!active || correct))
+                    context.clearRect(gx, gy, 3, 3);
 
-                        context.fillStyle = `rgba(${rr},${rg},${rb},0.05)`;
-                        context.fillRect(gx, gy, 3, 3);
-                    } else {
-                        context.fillStyle = `rgba(${tr},${tg},${tb},1)`;
-                        context.fillRect(gx + 1, gy + 1, 1, 1);
-                    }
+                // Fade color while focusing if active but already correctly painted.
+                if (active && correct && isFocusing) {
+                    context.fillStyle = `rgba(${rr},${rg},${rb},0.2)`;
+                    context.fillRect(gx, gy, 3, 3);
+                }
+
+                // Render centered guide pixels.
+                if (active && !correct) {
+                    context.fillStyle = `rgba(${tr},${tg},${tb},1)`;
+                    context.fillRect(gx + 1, gy + 1, 1, 1);
                 }
 
                 // Stats...
+                let stats = tile.pixels.get(tkey);
+
+                if (!stats) {
+                    stats = { painted: 0, mistake: 0 };
+                    tile.pixels.set(tkey, stats);
+                }
+
                 // const color = indexedColors.get(tkey);
-                // const painted = ra !== 0;
 
-                // if (painted && pixelsMatch)
-                //     color.painted += 1;
+                if (painted && correct)
+                    stats.painted += 1;
 
-                // if (painted && !pixelsMatch)
-                //     color.mistake += 1;
+                if (painted && !correct)
+                    stats.mistake += 1;
             }
         }
 
-        // Save stats...
-        template.colors = [...indexedColors.values()];
-        await setValue("templates", JSON.stringify(templates));
+        updateColorStats();
 
         const b = await canvas.convertToBlob({ type: "image/png" });
+
+        console.log("Processed tile ", tileKey);
 
         return messages.sendToInline<InterceptedBlobMessage>("intercepted-blob", {
             endpoint,

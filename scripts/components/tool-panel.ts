@@ -134,9 +134,16 @@ export class ToolPanel extends LitElement {
         messages.listenToInline("command", async message => {
             const { command, data } = message as CommandMessage;
 
-            if (command === "set-origin") {
-                this._origin = data;
-                this._homing = false;
+            switch (command) {
+                case "set-origin":
+                    this._origin = data;
+                    this._homing = false;
+                    break;
+                case "update-stats":
+                    // FIXME: Diff. name?
+                    await this.init();
+                    this.requestUpdate();
+                    break;
             }
         });
     }
@@ -194,6 +201,11 @@ export class ToolPanel extends LitElement {
         // Update active template.
         this._template = template;
         await setValueFromInline("active-template", template.id);
+
+        this.requestUpdate();
+        messages.sendToIsolated("command", {
+            command: "update-template"
+        });
     }
 
     private async toggleAllColor() {
@@ -259,7 +271,13 @@ export class ToolPanel extends LitElement {
                     <span class="grow">${swatch.name}</span>
                 </div>
                 <div class="tc-col px-cnt">
-                    <span>${numbers.toDecimal(color.count)}</span>
+                    <span>
+                        ${numbers.toDecimal(color.painted)}
+                        /
+                        ${numbers.toDecimal(color.mistake)}
+                        /
+                        ${numbers.toDecimal(color.count)}
+                    </span>
                 </div>
             </div>
         `;
