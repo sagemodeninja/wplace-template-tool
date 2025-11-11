@@ -1,13 +1,12 @@
 // Responsible for intercepting fetch requests from client.
 
-import "./components";
+import "@/components";
 import "../styles/index.scss";
 
-import { InterceptedBlobMessage, ToolMessage } from "./structs";
-import { messages } from "./utils/messages";
-import { attachInline } from "./utils/storage";
+import { InterceptedBlobMessage } from "@/structs";
+import { store, messages } from "@/utils";
 
-attachInline(window);
+store.init(); // Allow storage API to work on both worlds (isolated/inline).
 
 (() => {
     const ofetch = window.fetch;

@@ -1,79 +1,108 @@
-const MANAGED_KEY_PREFIX = "wplace-template-tool-";
+import { StorageMessage } from "@/structs/storage";
+import { messages } from "@/utils/messages";
 
+declare const SCRIPT_WORLD: "ISOLATED" | "INLINE"; // Populated by @rollup/plugin-replace.
 const queue = new Map<string, Function>();
 
-export const attachIsolated = (window: Window) => {
-    window.addEventListener("message", async event => {
-        const { source, world, type, data } = event.data;
+// Private/Internal
+const initIsolated = () => {
+    messages.listenToIsolated("utils/storage", async (message: StorageMessage) => {
+        const { sender, method, key, value } = message;
 
-        if (source !== "wplace-template-tool" || world !== "isolated" || type !== "utils/storage")
-            return;
+        const result = method === "GET"
+            ? await getValue(key)
+            : await setValue(key, value);
 
-        const { key, value } = data;
-        const result = data.op === "set"
-            ? await setValue(key, value)
-            : await getValue(key);
-
-        window.postMessage({
-            source: "wplace-template-tool",
-            world: "main",
-            type: "utils/storage",
-            data: { id: data.id, result }
-        }, "*");
+        messages.sendToInline<StorageMessage>("utils/storage", {
+            sender, method, key, value: result
+        });
     });
 };
 
-export const attachInline = (window: Window) => {
-    window.addEventListener("message", event => {
-        const { source, world, type, data } = event.data;
-
-        if (source !== "wplace-template-tool" || world !== "main" || type !== "utils/storage")
-            return;
-
-        const callback = queue.get(data.id);
+const initInline = () => {
+    messages.listenToInline("utils/storage", async (message: StorageMessage) => {
+        const { sender, value } = message;
+        const callback = queue.get(sender);
 
         if (!callback) return;
 
-        callback(data.result);
-        queue.delete(data.id);
+        callback(value);
+        queue.delete(sender);
     });
+};
+
+const getValueFromInline = (key: string) => {
+    const sender = crypto.randomUUID();
+    const task = new Promise<any>(resolve => queue.set(sender, resolve));
+
+    messages.sendToIsolated("utils/storage", {
+        sender, method: "GET", key
+    });
+
+    return task;
+};
+
+const getValue = async (key: string) => {
+    const result = await chrome.storage.local.get(key);
+
+    // Does not exists.
+    if (!result || !result[key])
+        return undefined;
+
+    const [type, value] = result[key].split(/:(.*)/, 2);
+
+    if (type === "boolean")
+        return value === "true";
+
+    if (type === "number")
+        return Number(value);
+
+    if (type === "object")
+        return JSON.parse(value);
+
+    return value;
+};
+
+const setValueFromInline = (key: string, value: any) => {
+    const sender = crypto.randomUUID();
+    const task = new Promise(resolve => queue.set(sender, resolve));
+
+    messages.sendToIsolated("utils/storage", {
+        sender, method: "SET", key, value
+    });
+
+    return task;
+};
+
+const setValue = async (key: string, value: any) => {
+    const type = typeof value;
+
+    if (type === "object")
+        value = JSON.stringify(value);
+
+    // We append the type so we could later "infer"
+    // how to decode the value.
+    await chrome.storage.local.set({ [key]: `${type}:${value}` });
+};
+
+// Public
+const init = () => {
+    return (SCRIPT_WORLD === "ISOLATED")
+        ? initIsolated()
+        : initInline();
 }
 
-export const setValue = async (key: string, value: string) => {
-    key = MANAGED_KEY_PREFIX + key;
-    await chrome.storage.local.set({ [key]: value });
-};
+const get = async <T>(key: string): Promise<T> => {
+    return SCRIPT_WORLD === "ISOLATED"
+        ? await getValue(key)
+        : await getValueFromInline(key);
+}
 
-export const getValue = async (key: string) => {
-    key = MANAGED_KEY_PREFIX + key;
-    const result = await chrome.storage.local.get(key);
-    return result[key] as string;
-};
+const set = async (key: string, value: any) => {
+    if (SCRIPT_WORLD === "ISOLATED")
+        await setValue(key, value);
+    else
+        await setValueFromInline(key, value);
+}
 
-export const setValueFromInline = (key: string, value: string) => {
-    const id = crypto.randomUUID();
-    const task = new Promise(resolve => queue.set(id, resolve));
-
-    window.postMessage({
-        source: "wplace-template-tool",
-        world: "isolated",
-        type: "utils/storage",
-        data: { id, op: "set", key, value }
-    }, "*");
-
-    return task;
-};
-
-export const getValueFromInline = (key: string) => {
-    const id = crypto.randomUUID();
-    const task = new Promise<string>(resolve => queue.set(id, resolve));
-
-    window.postMessage({
-        source: "wplace-template-tool",
-        world: "isolated",
-        type: "utils/storage",
-        data: { id, op: "get", key }
-    }, "*");
-
-    return task;
-};
+export const store = { init, get, set };

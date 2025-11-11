@@ -1,9 +1,8 @@
 import { html, LitElement, PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
-import { getValueFromInline, setValueFromInline } from "../utils/storage";
-import { messages } from "../utils/messages";
-import { CommandMessage } from "../structs";
+import { CommandMessage } from "@/structs";
+import { store, messages } from "@/utils";
 
 @customElement("focus-toggle")
 export class FocusToggle extends LitElement {
@@ -47,8 +46,7 @@ export class FocusToggle extends LitElement {
     }
 
     private async init() {
-        const enabled = await getValueFromInline("focus-enabled");
-        this._focusEnabled = enabled === "true";
+        this._focusEnabled = await store.get("focus-enabled");
     }
 
     private handleShortcut(e: KeyboardEvent) {
@@ -60,7 +58,7 @@ export class FocusToggle extends LitElement {
 
     private async toggleFocus() {
         this._focusEnabled = !this._focusEnabled;
-        await setValueFromInline("focus-enabled", this._focusEnabled.toString());
+        await store.set("focus-enabled", this._focusEnabled);
         messages.sendToIsolated<CommandMessage>("command", {
             command: "toggle-focus",
             data: this._focusEnabled

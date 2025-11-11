@@ -4,14 +4,13 @@ import { repeat } from "lit/directives/repeat.js";
 import { classMap } from "lit/directives/class-map.js";
 import { computePosition, offset, flip, shift } from "@floating-ui/dom";
 import { CommandMessage, Template, TemplateColor, Origin } from "@/structs";
-import { getValueFromInline, setValueFromInline } from "@/utils/storage";
+import { store } from "@/utils/storage";
 import { colors, numbers, messages, createTemplate } from "@/utils";
 
 @customElement("tool-panel")
 export class ToolPanel extends LitElement {
     private _origin: Origin;
     private _template: Template;
-    private _templates = new Array<Template>();
 
     private _allColorsEnabled: boolean;
 
@@ -106,17 +105,9 @@ export class ToolPanel extends LitElement {
     }
 
     private async init() {
-        // Restore stored origin.
-        const origin = await getValueFromInline("origin");
-        this._origin = origin ? JSON.parse(origin) : undefined;
-
-        const templates = await getValueFromInline("templates");
-        this._templates = templates ? JSON.parse(templates) : [];
-
-        const active = await getValueFromInline("active-template");
-        this._template = this._templates.find(t => t.id === active);
-
-        this._allColorsEnabled = !this._template.colors.some(c => !c.enabled);
+        this._origin = await store.get("origin");
+        this._template = await store.get("template");
+        this._allColorsEnabled = this._template ? !this._template.colors.some(c => !c.enabled) : false;
     }
 
     private addEventListeners() {
@@ -193,19 +184,9 @@ export class ToolPanel extends LitElement {
 
         if (!files || files.length === 0) return;
 
-        const template = await createTemplate(files[0], this._origin);
-
-        this._templates.push(template);
-        await setValueFromInline("templates", JSON.stringify(this._templates));
-
         // Update active template.
-        this._template = template;
-        await setValueFromInline("active-template", template.id);
-
-        this.requestUpdate();
-        messages.sendToIsolated("command", {
-            command: "update-template"
-        });
+        this._template = await createTemplate(files[0], this._origin);
+        this.save();
     }
 
     private async toggleAllColor() {
@@ -213,27 +194,19 @@ export class ToolPanel extends LitElement {
         for (const color of this._template.colors) {
             color.enabled = this._allColorsEnabled;
         }
-
-        // Save?
-        await setValueFromInline("templates", JSON.stringify(this._templates));
-
-        this.requestUpdate("_template");
-        messages.sendToIsolated("command", {
-            command: "update-template"
-        });
+        this.save();
     }
 
     private async toggleColor(color: TemplateColor, event: Event) {
         event.stopPropagation();
         color.enabled = !color.enabled;
+        this.save();
+    }
 
-        // Save?
-        await setValueFromInline("templates", JSON.stringify(this._templates));
-
+    private async save() {
+        await store.set("template", this._template);
+        messages.sendToIsolated("command", { command: "update-template" });
         this.requestUpdate("_template");
-        messages.sendToIsolated("command", {
-            command: "update-template"
-        });
     }
 
     private renderTemplateColor(color: TemplateColor) {

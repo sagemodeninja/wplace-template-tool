@@ -1,4 +1,5 @@
 import alias from "@rollup/plugin-alias";
+import replace from "@rollup/plugin-replace";
 import resolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
 import scss from "rollup-plugin-scss";
@@ -17,6 +18,10 @@ export default {
             entries: [
                 { find: "@", replacement: "scripts" }
             ]
+        }),
+        replace({
+            SCRIPT_WORLD: "\"INLINE\"",
+            preventAssignment: true
         }),
         resolve({
             extensions: [".js", ".ts"]

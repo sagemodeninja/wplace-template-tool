@@ -3,7 +3,7 @@ export type ScriptWorld = "isolated" | "inline";
 export interface ToolMessage {
     source: "wplace-template-tool",
     world: ScriptWorld,
-    type: "command" | "intercepted-json" | "intercepted-blob",
+    type: "command" | "intercepted-json" | "intercepted-blob" | "utils/storage",
 }
 
 export interface CommandMessage extends ToolMessage {

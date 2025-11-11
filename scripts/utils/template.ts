@@ -1,7 +1,9 @@
 // Responsible for managing templates.
 
-import { Origin, TemplateBounds, Template, TemplateColor, TemplateTile } from "@/structs";
-import { color, image, file as files } from "@/utils";
+import { Origin, TemplateBounds, Template, TemplateColor } from "@/structs";
+import { color } from "@/utils/colors";
+import { image } from "@/utils/image";
+import { file as files } from "@/utils/file";
 
 // TODO: Each tile should track its own stats.
 // NOTE: Every repaint should reset stats.
@@ -14,7 +16,7 @@ export const createTemplate = async (file: File, origin: Origin) => {
     const data = await files.getDataURL(file);
     const img = await image.create(data);
 
-    const tiles: Record<string, TemplateTile> = {}; // <tileCoord, dataURL>
+    const tiles: Record<string, string> = {}; // <coord, dataURL>
     const { width, height } = img;
 
     // Determine right/bottom bounds.
@@ -46,8 +48,7 @@ export const createTemplate = async (file: File, origin: Origin) => {
 
             // Export and store as tile.
             const blob = await canvas.convertToBlob({ type: "image/png" });
-            const data = await files.getDataURL(blob);
-            tiles[`${tileX}_${tileY}`] = { data };
+            tiles[`${tileX}_${tileY}`] = await files.getDataURL(blob);
         }
     }
 

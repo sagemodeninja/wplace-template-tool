@@ -6,17 +6,13 @@ export interface TemplateColor {
     count: number,
     painted: number,
     mistake: number,
-    enabled: boolean
-}
-
-export interface TemplateTile {
-    data: string,
+    enabled: boolean,
 }
 
 export interface Template {
     id: string,
     filename: string,
-    bounds: TemplateBounds,
-    tiles: Record<string, TemplateTile>,
+    tiles: Record<string, string>, // <coord, data>
     colors: TemplateColor[],
+    bounds: TemplateBounds,
 }

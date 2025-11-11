@@ -1,11 +1,10 @@
-import { CommandMessage, InterceptedBlobMessage, InterceptedJsonMessage, Origin, Template, TemplateColor, TemplateTile } from "./structs";
-import { attachIsolated, getValue, setValue } from "@/utils/storage";
-import { image, messages } from "@/utils";
+import { CommandMessage, InterceptedBlobMessage, InterceptedJsonMessage, Origin, Template, TemplateColor } from "./structs";
+import { image, messages, store } from "@/utils";
 
 const TILE_SIZE = 1000;
 const SIZE_MULT = 3; // Scales each pixel into a 3x3 pixel grid.
 
-attachIsolated(window);
+store.init(); // Allow storage API to work on both worlds (isolated/inline).
 
 const inject = () => {
     // Spy
@@ -35,31 +34,24 @@ interface StatefulTemplateTile {
 
 let isHoming = false;
 let isFocusing = false;
-let templates: Template[];
-let template: Template | undefined;
+let template: Template;
 let colorStatuses = new Set<string>();
 let indexedColors = new Map<string, TemplateColor>();
 let tiles = new Map<string, StatefulTemplateTile>();
 
 (async () => {
-    const value = await getValue("focus-enabled");
-    isFocusing = value === "true";
+    isFocusing = await store.get("focus-enabled");
 })();
 
 // Fetch templates...
 const updateTemplate = async () => {
-    const active = await getValue("active-template");
+    template = await store.get("template");
 
-    if (!active) return;
-
-    const value = await getValue("templates");
-
-    templates = value ? JSON.parse(value) as Template[] : [];
-    template = templates.find(t => t.id === active);
+    if (!template) return;
 
     // Cache tiles...
     // FIXME: Complicated and perhaps inefficient!
-    tiles = new Map(Object.entries(template.tiles).map(([k, t]) => [k, { data: t.data, pixels: new Map() }]));
+    tiles = new Map(Object.entries(template.tiles).map(([k, t]) => [k, { data: t, pixels: new Map() }]));
 
     // Update color cache...
     colorStatuses.clear();
@@ -104,7 +96,7 @@ const updateColorStats = async () => {
         });
 
         // Save stats...
-        await setValue("templates", JSON.stringify(templates));
+        await store.set("template", template);
 
         // Notify panel...
         messages.sendToInline<CommandMessage>("command", {
@@ -149,7 +141,7 @@ const handleInterceptedJson = async (message: InterceptedJsonMessage) => {
             const offsetY = parseInt(coords.get("y")?.toString()!);
 
             const origin = { tileX, tileY, offsetX, offsetY } as Origin;
-            setValue("origin", JSON.stringify(origin));
+            store.set("origin", origin);
 
             return messages.sendToInline<CommandMessage>("command", {
                 command: "set-origin",
@@ -299,8 +291,6 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
                     tile.pixels.set(tkey, stats);
                 }
 
-                // const color = indexedColors.get(tkey);
-
                 if (painted && correct)
                     stats.painted += 1;
 
@@ -351,7 +341,6 @@ messages.listenToIsolated("*", async message => {
 
     sidebar.appendChild(document.createElement("tool-panel"));
 })();
-
 
 document.addEventListener("click", (e) => {
     const toolbar = document.querySelector("#map ~ .bottom-0 > div > div > .flex > .flex");
