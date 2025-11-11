@@ -3,16 +3,17 @@ import { customElement, query, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { classMap } from "lit/directives/class-map.js";
 import { computePosition, offset, flip, shift } from "@floating-ui/dom";
-import { CommandMessage, Origin, Template, TemplateColor } from "../structs";
-import { getValueFromInline, setValueFromInline } from "../utils/storage";
-import { createImage, getImageData, color, colors } from "../utils";
-import { messages } from "../utils/messages";
+import { CommandMessage, Template, TemplateColor, Origin } from "@/structs";
+import { getValueFromInline, setValueFromInline } from "@/utils/storage";
+import { colors, numbers, messages, createTemplate } from "@/utils";
 
 @customElement("tool-panel")
 export class ToolPanel extends LitElement {
     private _origin: Origin;
     private _template: Template;
     private _templates = new Array<Template>();
+
+    private _allColorsEnabled: boolean;
 
     @state()
     private _homing = false;
@@ -29,9 +30,9 @@ export class ToolPanel extends LitElement {
     public render() {
         return html`
             <button id="toggle" class="btn btn-square shadow-md relative" title="Toggle Tool" @click=${this.toggleMenu}>
-                <svg class="size-5" viewBox="0 0 21.2207 24.3848">
-                    <path d="M4.3457 15.7227C4.13086 15.7227 3.98438 15.8594 3.96484 16.084C3.59375 19.1016 3.44727 19.1797 0.390625 19.6777C0.136719 19.707 0 19.834 0 20.0586C0 20.2734 0.136719 20.4004 0.341797 20.4297C3.42773 21.0254 3.59375 21.0059 3.96484 24.0137C3.98438 24.248 4.13086 24.3848 4.3457 24.3848C4.55078 24.3848 4.70703 24.248 4.72656 24.0234C5.11719 20.9668 5.23438 20.8789 8.33984 20.4297C8.53516 20.4102 8.68164 20.2734 8.68164 20.0586C8.68164 19.8438 8.53516 19.707 8.33984 19.6777C5.23438 19.082 5.12695 19.082 4.72656 16.0645C4.70703 15.8594 4.55078 15.7227 4.3457 15.7227Z" fill="currentcolor"/>
-                    <path d="M11.9824 3.24219C11.6992 3.24219 11.4746 3.44727 11.4355 3.75C10.5859 9.93164 9.73633 10.752 3.64258 11.5625C3.33008 11.5918 3.10547 11.8164 3.10547 12.1094C3.10547 12.4121 3.33008 12.6465 3.64258 12.6758C9.75586 13.3398 10.6348 14.2969 11.4355 20.4688C11.4746 20.7715 11.6992 20.9863 11.9824 20.9863C12.2754 20.9863 12.4902 20.7715 12.5391 20.4688C13.3496 14.2969 14.2188 13.3398 20.332 12.6758C20.6543 12.6465 20.8594 12.4121 20.8594 12.1094C20.8594 11.8164 20.6543 11.5918 20.332 11.5625C14.2188 10.8789 13.3496 9.93164 12.5391 3.75C12.4902 3.44727 12.2754 3.24219 11.9824 3.24219Z" fill="currentcolor"/>
+                <svg class="size-5" viewBox="0 0 20.3223 20.8301">
+                    <path d="M18.8574 13.2812C19.6484 13.75 19.9609 14.1016 19.9609 14.6387C19.9609 15.1758 19.6484 15.5273 18.8574 15.9863L11.2207 20.4297C10.752 20.7031 10.3711 20.8301 9.98047 20.8301C9.58008 20.8301 9.20898 20.7031 8.74023 20.4297L1.09375 15.9863C0.302734 15.5273 0 15.1758 0 14.6387C0 14.1016 0.302734 13.75 1.09375 13.2812L5.65806 10.6348L8.74023 12.4219C9.20898 12.6953 9.58008 12.8223 9.98047 12.8223C10.3711 12.8223 10.752 12.6953 11.2207 12.4219L14.2989 10.6348Z" fill="currentcolor"/>
+                    <path d="M9.98047 12.8223C10.3711 12.8223 10.752 12.6953 11.2207 12.4219L18.8574 7.98828C19.6484 7.51953 19.9609 7.16797 19.9609 6.63086C19.9609 6.09375 19.6484 5.74219 18.8574 5.2832L11.2207 0.839844C10.752 0.566406 10.3711 0.439453 9.98047 0.439453C9.58008 0.439453 9.20898 0.566406 8.74023 0.839844L1.09375 5.2832C0.302734 5.74219 0 6.09375 0 6.63086C0 7.16797 0.302734 7.51953 1.09375 7.98828L8.74023 12.4219C9.20898 12.6953 9.58008 12.8223 9.98047 12.8223ZM9.98047 11.1133C9.84375 11.1133 9.70703 11.0742 9.54102 10.9766L2.10938 6.72852C2.07031 6.70898 2.04102 6.67969 2.04102 6.63086C2.04102 6.58203 2.07031 6.5625 2.10938 6.5332L9.54102 2.28516C9.70703 2.19727 9.84375 2.14844 9.98047 2.14844C10.1172 2.14844 10.2539 2.19727 10.4102 2.28516L17.8418 6.5332C17.8906 6.5625 17.9199 6.58203 17.9199 6.63086C17.9199 6.67969 17.8906 6.70898 17.8418 6.72852L10.4102 10.9766C10.2539 11.0742 10.1172 11.1133 9.98047 11.1133Z" fill="currentcolor"/>
                 </svg>
             </button>
             <div
@@ -43,9 +44,9 @@ export class ToolPanel extends LitElement {
             >
                 <div id="header">
                     <h3 class="text-lg font-semibold flex gap-2">
-                        <svg class="size-6" viewBox="0 0 21.2207 24.3848">
-                            <path d="M4.3457 15.7227C4.13086 15.7227 3.98438 15.8594 3.96484 16.084C3.59375 19.1016 3.44727 19.1797 0.390625 19.6777C0.136719 19.707 0 19.834 0 20.0586C0 20.2734 0.136719 20.4004 0.341797 20.4297C3.42773 21.0254 3.59375 21.0059 3.96484 24.0137C3.98438 24.248 4.13086 24.3848 4.3457 24.3848C4.55078 24.3848 4.70703 24.248 4.72656 24.0234C5.11719 20.9668 5.23438 20.8789 8.33984 20.4297C8.53516 20.4102 8.68164 20.2734 8.68164 20.0586C8.68164 19.8438 8.53516 19.707 8.33984 19.6777C5.23438 19.082 5.12695 19.082 4.72656 16.0645C4.70703 15.8594 4.55078 15.7227 4.3457 15.7227Z" fill="currentcolor"/>
-                            <path d="M11.9824 3.24219C11.6992 3.24219 11.4746 3.44727 11.4355 3.75C10.5859 9.93164 9.73633 10.752 3.64258 11.5625C3.33008 11.5918 3.10547 11.8164 3.10547 12.1094C3.10547 12.4121 3.33008 12.6465 3.64258 12.6758C9.75586 13.3398 10.6348 14.2969 11.4355 20.4688C11.4746 20.7715 11.6992 20.9863 11.9824 20.9863C12.2754 20.9863 12.4902 20.7715 12.5391 20.4688C13.3496 14.2969 14.2188 13.3398 20.332 12.6758C20.6543 12.6465 20.8594 12.4121 20.8594 12.1094C20.8594 11.8164 20.6543 11.5918 20.332 11.5625C14.2188 10.8789 13.3496 9.93164 12.5391 3.75C12.4902 3.44727 12.2754 3.24219 11.9824 3.24219Z" fill="currentcolor"/>
+                        <svg class="size-6" viewBox="0 0 20.3223 20.8301">
+                            <path d="M18.8574 13.2812C19.6484 13.75 19.9609 14.1016 19.9609 14.6387C19.9609 15.1758 19.6484 15.5273 18.8574 15.9863L11.2207 20.4297C10.752 20.7031 10.3711 20.8301 9.98047 20.8301C9.58008 20.8301 9.20898 20.7031 8.74023 20.4297L1.09375 15.9863C0.302734 15.5273 0 15.1758 0 14.6387C0 14.1016 0.302734 13.75 1.09375 13.2812L5.65806 10.6348L8.74023 12.4219C9.20898 12.6953 9.58008 12.8223 9.98047 12.8223C10.3711 12.8223 10.752 12.6953 11.2207 12.4219L14.2989 10.6348Z" fill="currentcolor"/>
+                            <path d="M9.98047 12.8223C10.3711 12.8223 10.752 12.6953 11.2207 12.4219L18.8574 7.98828C19.6484 7.51953 19.9609 7.16797 19.9609 6.63086C19.9609 6.09375 19.6484 5.74219 18.8574 5.2832L11.2207 0.839844C10.752 0.566406 10.3711 0.439453 9.98047 0.439453C9.58008 0.439453 9.20898 0.566406 8.74023 0.839844L1.09375 5.2832C0.302734 5.74219 0 6.09375 0 6.63086C0 7.16797 0.302734 7.51953 1.09375 7.98828L8.74023 12.4219C9.20898 12.6953 9.58008 12.8223 9.98047 12.8223ZM9.98047 11.1133C9.84375 11.1133 9.70703 11.0742 9.54102 10.9766L2.10938 6.72852C2.07031 6.70898 2.04102 6.67969 2.04102 6.63086C2.04102 6.58203 2.07031 6.5625 2.10938 6.5332L9.54102 2.28516C9.70703 2.19727 9.84375 2.14844 9.98047 2.14844C10.1172 2.14844 10.2539 2.19727 10.4102 2.28516L17.8418 6.5332C17.8906 6.5625 17.9199 6.58203 17.9199 6.63086C17.9199 6.67969 17.8906 6.70898 17.8418 6.72852L10.4102 10.9766C10.2539 11.0742 10.1172 11.1133 9.98047 11.1133Z" fill="currentcolor"/>
                         </svg>
                         Wplace Template Tool
                     </h3>
@@ -69,6 +70,26 @@ export class ToolPanel extends LitElement {
                     </label>
                 </div>
                 <div id="temp-colors" class="flex flex-col gap-3">
+                    <div class="tc-row tc-header text-base-content/80 ${classMap({ enabled: this._allColorsEnabled })}">
+                        <div class="tc-col">
+                            <button class="tc-toggle btn btn-circle btn-ghost text-base-content/80 size-6" @click=${this.toggleAllColor.bind(this)}>
+                                ${this._allColorsEnabled ? html`
+                                    <svg class="size-4" viewBox="0 0 24 24" fill="none">
+                                        <path d="M3 14C3 9.02944 7.02944 5 12 5C16.9706 5 21 9.02944 21 14M17 14C17 16.7614 14.7614 19 12 19C9.23858 19 7 16.7614 7 14C7 11.2386 9.23858 9 12 9C14.7614 9 17 11.2386 17 14Z" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                ` : html`
+                                    <svg class="size-4" viewBox="0 0 24 24" fill="none">
+                                        <path d="M9.60997 9.60714C8.05503 10.4549 7 12.1043 7 14C7 16.7614 9.23858 19 12 19C13.8966 19 15.5466 17.944 16.3941 16.3878M21 14C21 9.02944 16.9706 5 12 5C11.5582 5 11.1238 5.03184 10.699 5.09334M3 14C3 11.0069 4.46104 8.35513 6.70883 6.71886M3 3L21 21" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>`}
+                            </button>
+                        </div>
+                        <div class="tc-col">
+                            <span>Colors</span>
+                        </div>
+                        <div class="tc-col px-cnt">
+                            <span>Pixel Count</span>
+                        </div>
+                    </div>
                     ${repeat(this._template?.colors ?? [], c => c.id, this.renderTemplateColor.bind(this))}
                 </div>
             </div>
@@ -94,10 +115,12 @@ export class ToolPanel extends LitElement {
 
         const active = await getValueFromInline("active-template");
         this._template = this._templates.find(t => t.id === active);
+
+        this._allColorsEnabled = !this._template.colors.some(c => !c.enabled);
     }
 
     private addEventListeners() {
-        document.addEventListener("click", (e: Event) => {
+        document.addEventListener("pointerdown", (e: Event) => {
             const target = e.target as Element;
 
             if (target.closest("tool-panel"))
@@ -108,12 +131,19 @@ export class ToolPanel extends LitElement {
         });
 
         // Listen for commands
-        messages.listenInline("command", async message => {
+        messages.listenToInline("command", async message => {
             const { command, data } = message as CommandMessage;
 
-            if (command === "set-origin") {
-                this._origin = data;
-                this._homing = false;
+            switch (command) {
+                case "set-origin":
+                    this._origin = data;
+                    this._homing = false;
+                    break;
+                case "update-stats":
+                    // FIXME: Diff. name?
+                    await this.init();
+                    this.requestUpdate();
+                    break;
             }
         });
     }
@@ -163,90 +193,92 @@ export class ToolPanel extends LitElement {
 
         if (!files || files.length === 0) return;
 
-        const id = crypto.randomUUID();
-        const file = files[0];
-
-        const data = await this.fileToDataURL(file);
-        const image = await createImage(data);
-
-        const { width, height } = image;
-        const { data: pixels } = getImageData(image);
-
-        const unsorted = new Map<string, number>();
-
-        for (var i = 0; i < pixels.length; i += 4) {
-            const key = `${pixels[i]}_${pixels[i + 1]}_${pixels[i + 2]}`;
-            unsorted.set(key, (unsorted.get(key) ?? 0) + 1);
-        }
-
-        const colors = [...unsorted.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([key, count]) => ({
-                id: color.indexOf(key),
-                enabled: true,
-                count
-            }) as TemplateColor);
-
-        // Update templates...
-        const { x, y } = this._origin!;
-        const template = {
-            id,
-            origin: this._origin!,
-            bounds: { width, height, x, y },
-            filename: file.name,
-            colors,
-            data,
-        };
+        const template = await createTemplate(files[0], this._origin);
 
         this._templates.push(template);
         await setValueFromInline("templates", JSON.stringify(this._templates));
 
         // Update active template.
         this._template = template;
-        await setValueFromInline("active-template", id);
-    }
+        await setValueFromInline("active-template", template.id);
 
-    private toggleColor(color: TemplateColor, event: Event) {
-        event.stopPropagation();
-        color.enabled = !color.enabled;
-        this.requestUpdate("_template");
-    }
-
-    private fileToDataURL(file: File) {
-        return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
+        this.requestUpdate();
+        messages.sendToIsolated("command", {
+            command: "update-template"
         });
     }
 
-    private renderTemplateColor(c: TemplateColor) {
-        const color = colors[c.id];
+    private async toggleAllColor() {
+        this._allColorsEnabled = !this._allColorsEnabled;
+        for (const color of this._template.colors) {
+            color.enabled = this._allColorsEnabled;
+        }
+
+        // Save?
+        await setValueFromInline("templates", JSON.stringify(this._templates));
+
+        this.requestUpdate("_template");
+        messages.sendToIsolated("command", {
+            command: "update-template"
+        });
+    }
+
+    private async toggleColor(color: TemplateColor, event: Event) {
+        event.stopPropagation();
+        color.enabled = !color.enabled;
+
+        // Save?
+        await setValueFromInline("templates", JSON.stringify(this._templates));
+
+        this.requestUpdate("_template");
+        messages.sendToIsolated("command", {
+            command: "update-template"
+        });
+    }
+
+    private renderTemplateColor(color: TemplateColor) {
+        const swatch = colors[color.id];
+
+        const classes = classMap({
+            enabled: color.enabled
+        });
+
         return html`
-            <div class="flex gap-2 temp-color">
-                <button class="btn btn-circle btn-ghost text-base-content/80 size-6" @click=${this.toggleColor.bind(this, c)}>
-                    ${c.enabled ? html`
-                        <svg class="size-4" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 14C3 9.02944 7.02944 5 12 5C16.9706 5 21 9.02944 21 14M17 14C17 16.7614 14.7614 19 12 19C9.23858 19 7 16.7614 7 14C7 11.2386 9.23858 9 12 9C14.7614 9 17 11.2386 17 14Z" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    ` : html`
-                        <svg class="size-4" viewBox="0 0 24 24" fill="none">
-                            <path d="M9.60997 9.60714C8.05503 10.4549 7 12.1043 7 14C7 16.7614 9.23858 19 12 19C13.8966 19 15.5466 17.944 16.3941 16.3878M21 14C21 9.02944 16.9706 5 12 5C11.5582 5 11.1238 5.03184 10.699 5.09334M3 14C3 11.0069 4.46104 8.35513 6.70883 6.71886M3 3L21 21" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>`}
-                </button>
-                <div class="color-sm rounded-lg p-0 border-base-content/20 aspect-square relative" style="background-color: rgb(${color.rgb.join()})">
-                    ${color.premium ? html`
-                        <span class="bg-base-100 translate-1/2 absolute bottom-0 right-0 flex size-4.5 items-center justify-center rounded-full max-sm:hidden">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="text-base-content/80 size-3">
-                                <path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z">
-                                </path>
+            <div class="tc-row ${classes} temp-color">
+                <div class="tc-col">
+                    <button class="tc-toggle btn btn-circle btn-ghost text-base-content/80 size-6" @click=${this.toggleColor.bind(this, color)}>
+                        ${color.enabled ? html`
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 14C3 9.02944 7.02944 5 12 5C16.9706 5 21 9.02944 21 14M17 14C17 16.7614 14.7614 19 12 19C9.23858 19 7 16.7614 7 14C7 11.2386 9.23858 9 12 9C14.7614 9 17 11.2386 17 14Z" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                        </span>
-                    ` : nothing}
+                        ` : html`
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none">
+                                <path d="M9.60997 9.60714C8.05503 10.4549 7 12.1043 7 14C7 16.7614 9.23858 19 12 19C13.8966 19 15.5466 17.944 16.3941 16.3878M21 14C21 9.02944 16.9706 5 12 5C11.5582 5 11.1238 5.03184 10.699 5.09334M3 14C3 11.0069 4.46104 8.35513 6.70883 6.71886M3 3L21 21" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>`}
+                    </button>
                 </div>
-                <span class="grow">${color.name}</span>
-                ${c.count}
+                <div class="tc-col">
+                    <div class="color-sm rounded-lg p-0 border-base-content/20 aspect-square relative" style="background-color: rgb(${swatch.rgb.join()})">
+                        ${swatch.premium ? html`
+                            <span class="bg-base-100 translate-1/2 absolute bottom-0 right-0 flex size-4.5 items-center justify-center rounded-full max-sm:hidden">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor" class="text-base-content/80 size-3">
+                                    <path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z">
+                                    </path>
+                                </svg>
+                            </span>
+                        ` : nothing}
+                    </div>
+                    <span class="grow">${swatch.name}</span>
+                </div>
+                <div class="tc-col px-cnt">
+                    <span>
+                        ${numbers.toDecimal(color.painted)}
+                        /
+                        ${numbers.toDecimal(color.mistake)}
+                        /
+                        ${numbers.toDecimal(color.count)}
+                    </span>
+                </div>
             </div>
         `;
     }

@@ -1,6 +1,8 @@
 // Responsible for intercepting fetch requests from client.
 
 import "./components";
+import "../styles/index.scss";
+
 import { InterceptedBlobMessage, ToolMessage } from "./structs";
 import { messages } from "./utils/messages";
 import { attachInline } from "./utils/storage";
@@ -11,7 +13,7 @@ attachInline(window);
     const ofetch = window.fetch;
     const queue = new Map();
 
-    messages.listenInline("intercepted-blob", async (message: InterceptedBlobMessage) => {
+    messages.listenToInline("intercepted-blob", async (message: InterceptedBlobMessage) => {
         const { processed, blobId, blob } = message;
 
         if (!processed || !blobId || !blob) return;

@@ -38,4 +38,4 @@ const listenToInline = (type: string, callback: ListenerCallback) =>
 const listenToIsolated = (type: string, callback: ListenerCallback) =>
     listen("isolated", type, callback);
 
-export const messages = { sendToInline, sendToIsolated, listenInline: listenToInline, listenIsolated: listenToIsolated };
+export const messages = { sendToInline, sendToIsolated, listenToInline, listenToIsolated };

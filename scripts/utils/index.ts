@@ -1,2 +1,6 @@
-export * from "./image";
+export * from "./numbers";
 export * from "./colors";
+export * from "./image";
+export * from "./messages";
+export * from "./file";
+export * from "./template";

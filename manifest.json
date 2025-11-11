@@ -9,13 +9,13 @@
     },
     "content_scripts": [
         {
-            "js": ["scripts/isolated.js"],
+            "js": ["isolated.js"],
             "matches": ["https://wplace.live/*"]
         }
     ],
     "web_accessible_resources": [
         {
-            "resources": ["scripts/inline.js", "static/styles/index.css"],
+            "resources": ["inline.js", "styles.css"],
             "matches": ["https://wplace.live/*"]
         }
     ],
