@@ -21,11 +21,11 @@ store.init(); // Allow storage API to work on both worlds (isolated/inline).
         queue.delete(blobId);
     });
 
-    window.fetch = async function(...args) {
+    window.fetch = async function (...args) {
         const response = await ofetch.apply(this, args);
 
         const cloned = response.clone();
-        const endpoint = args[0] instanceof Request ? args[0].url : args[0] as string;
+        const endpoint = args[0] instanceof Request ? args[0].url : (args[0] as string);
         const contentType = cloned.headers.get("content-type") ?? "";
 
         if (contentType.includes("application/json")) {
@@ -40,17 +40,25 @@ store.init(); // Allow storage API to work on both worlds (isolated/inline).
                 const blobId = crypto.randomUUID();
 
                 queue.set(blobId, (processed: Blob) => {
-                    resolve(new Response(processed, {
-                        headers: cloned.headers,
-                        status: cloned.status,
-                        statusText: cloned.statusText
-                    }));
+                    resolve(
+                        new Response(processed, {
+                            headers: cloned.headers,
+                            status: cloned.status,
+                            statusText: cloned.statusText,
+                        })
+                    );
                 });
 
-                messages.sendToIsolated("intercepted-blob", { endpoint, blobId, blob });
+                const x = { test: 1 };
+
+                messages.sendToIsolated("intercepted-blob", {
+                    endpoint,
+                    blobId,
+                    blob,
+                });
             });
         }
 
         return response;
-    }
+    };
 })();

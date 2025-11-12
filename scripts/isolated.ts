@@ -1,6 +1,13 @@
 import "../styles/index.scss";
 
-import { CommandMessage, InterceptedBlobMessage, InterceptedJsonMessage, Origin, Template, TemplateColor } from "./structs";
+import {
+    CommandMessage,
+    InterceptedBlobMessage,
+    InterceptedJsonMessage,
+    Origin,
+    Template,
+    TemplateColor,
+} from "./structs";
 import { messages, store } from "@/utils";
 import { overlay } from "@/utils/template";
 
@@ -28,10 +35,10 @@ interface PixelStats {
 }
 
 interface StatefulTemplateTile {
-    tileX: number,
-    tileY: number,
-    data: string,
-    pixels: Map<string, PixelStats>, // <color, stats>
+    tileX: number;
+    tileY: number;
+    data: string;
+    pixels: Map<string, PixelStats>; // <color, stats>
 }
 
 let isHoming = false;
@@ -53,10 +60,12 @@ const updateTemplate = async () => {
 
     // Cache tiles...
     // FIXME: Complicated and perhaps inefficient!
-    tiles = new Map(Object.entries(template.tiles).map(([k, t]) => {
-        const [tileX, tileY] = k.split("_").map(Number);
-        return [k, { tileX, tileY, data: t, pixels: new Map() }];
-    }));
+    tiles = new Map(
+        Object.entries(template.tiles).map(([k, t]) => {
+            const [tileX, tileY] = k.split("_").map(Number);
+            return [k, { tileX, tileY, data: t, pixels: new Map() }];
+        })
+    );
 
     // Update color cache...
     colors.clear();
@@ -69,10 +78,9 @@ const updateTemplate = async () => {
         indexedColors.set(color.key, color);
 
         // Status
-        if (color.enabled)
-            colors.add(color.key);
+        if (color.enabled) colors.add(color.key);
     }
-}
+};
 
 updateTemplate();
 
@@ -105,10 +113,10 @@ const updateColorStats = async () => {
 
         // Notify panel...
         messages.sendToInline<CommandMessage>("command", {
-            command: "update-stats"
+            command: "update-stats",
         });
     }, 200);
-}
+};
 
 const handleCommands = (message: CommandMessage) => {
     switch (message.command) {
@@ -132,7 +140,7 @@ const handleInterceptedJson = async (message: InterceptedJsonMessage) => {
 
     const resouce = paths
         .filter(s => s && isNaN(Number(s))) // Ignore coordinates.
-        .filter(s => s && !s.includes("."))  // ?
+        .filter(s => s && !s.includes(".")) // ?
         .pop();
 
     switch (resouce) {
@@ -150,7 +158,7 @@ const handleInterceptedJson = async (message: InterceptedJsonMessage) => {
 
             return messages.sendToInline<CommandMessage>("command", {
                 command: "set-origin",
-                data: origin
+                data: origin,
             });
     }
 };
@@ -158,8 +166,7 @@ const handleInterceptedJson = async (message: InterceptedJsonMessage) => {
 const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
     const { endpoint, blobId, blob, processed } = message;
 
-    if (processed)
-        return;
+    if (processed) return;
 
     // Remove ".png" from tail and split by paths...
     const paths = endpoint.replace(".png", "").split("/");
@@ -228,11 +235,10 @@ messages.listenToIsolated("*", async message => {
     sidebar.appendChild(document.createElement("tool-panel"));
 })();
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", e => {
     const toolbar = document.querySelector("#map ~ .bottom-0 > div > div > .flex > .flex");
 
-    if (toolbar && !toolbar.querySelector("focus-toggle"))
-        toolbar.appendChild(document.createElement("focus-toggle"));
+    if (toolbar && !toolbar.querySelector("focus-toggle")) toolbar.appendChild(document.createElement("focus-toggle"));
 
     const swatches = document.querySelectorAll("#map ~ .bottom-0 > div > div > .mb-4 > div > div > button");
 
