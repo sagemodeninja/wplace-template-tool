@@ -2,6 +2,7 @@ import alias from "@rollup/plugin-alias";
 import replace from "@rollup/plugin-replace";
 import resolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
+import scss from "rollup-plugin-scss";
 import copy from "rollup-plugin-copy-watch";
 import terser from "@rollup/plugin-terser";
 
@@ -13,6 +14,7 @@ export default {
         dir: "dist",
         format: "iife",
         inlineDynamicImports: true,
+        assetFileNames: "[name][extname]",
         sourcemap: true
     },
     plugins: [
@@ -35,6 +37,9 @@ export default {
                 { src: "static/*", dest: "dist/static" },
                 { src: "manifest.json", dest: "dist" },
             ],
+        }),
+        scss({
+            fileName: "static/styles/index.css"
         }),
         terser()
     ],

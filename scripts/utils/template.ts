@@ -5,10 +5,20 @@ import { color } from "@/utils/colors";
 import { image } from "@/utils/image";
 import { file as files } from "@/utils/file";
 
-// TODO: Each tile should track its own stats.
-// NOTE: Every repaint should reset stats.
-
 const TILE_SIZE = 1000;
+const SIZE_MULT = 3; // Scales each pixel into a 3x3 pixel grid.
+
+interface PixelStats {
+    painted: number;
+    mistake: number;
+}
+
+interface StatefulTemplateTile {
+    tileX: number,
+    tileY: number,
+    data: string,
+    pixels: Map<string, PixelStats>, // <color, stats>
+}
 
 export const createTemplate = async (file: File, origin: Origin) => {
     const id = crypto.randomUUID();
@@ -84,3 +94,157 @@ export const createTemplate = async (file: File, origin: Origin) => {
 
     return template;
 }
+
+const needsLightBg = (r: number, g: number, b: number) => {
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b; // sRGB weighted
+    return luminance < 128;
+};
+
+/**
+ * Overlay a template to a tile.
+ */
+export const overlay = async (template: Template, blob: Blob, tile: StatefulTemplateTile, colors: Set<string>, isFocusing: boolean) => {
+    const origin = template.bounds;
+
+    const bitmap = await createImageBitmap(blob);
+    const { width, height } = template.bounds;
+    const drawSize = TILE_SIZE * SIZE_MULT;
+
+    const canvas = new OffscreenCanvas(drawSize, drawSize);
+    const context = canvas.getContext("2d");
+
+    context.imageSmoothingEnabled = false; // Nearest neighbor
+
+    context.beginPath();
+    context.rect(0, 0, drawSize, drawSize);
+    context.clip();
+
+    // The real/original image.
+    const realCanvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
+    const realContext = realCanvas.getContext("2d", { willReadFrequently: true });
+
+    if (!realContext) return;
+
+    // realContext.imageSmoothingEnabled = false; // Nearest neighbor
+
+    context.drawImage(bitmap, 0, 0, drawSize, drawSize);
+    realContext.drawImage(bitmap, 0, 0, TILE_SIZE, TILE_SIZE);
+    bitmap.close();
+
+    // TODO: Can be optimized!
+    const imageData = realContext.getImageData(0, 0, TILE_SIZE, TILE_SIZE);
+    const realPixels = imageData!.data!;
+
+    // The template image.
+    const tempCanvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
+    const tempContext = tempCanvas.getContext("2d", { willFrequentlyRead: true });
+
+    if (!tempContext) return;
+
+    tempContext.imageSmoothingEnabled = false; // Nearest neighbor
+
+    const img = await image.create(tile.data);
+
+    tempContext.drawImage(img, 0, 0);
+
+    const tempPixels = tempContext!.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+
+    // Convert current tile's indices to global coords.
+    const gctx = tile.tileX * TILE_SIZE;
+    const gcty = tile.tileY * TILE_SIZE;
+
+    // Convert origin's tile indices to global coords.
+    const gotx = origin.tileX * TILE_SIZE;
+    const goty = origin.tileY * TILE_SIZE;
+
+    // Convert origin to global coordinates.
+    const gox = origin.offsetX + gotx;
+    const goy = origin.offsetY + goty;
+
+    // Offset start relative to tile.
+    const startX = Math.max(0, gox - gctx);
+    const startY = Math.max(0, goy - gcty);
+
+    // Offset end relative to tile.
+    const endX = Math.min(TILE_SIZE, gox + width - gctx);
+    const endY = Math.min(TILE_SIZE, goy + height - gcty);
+
+    tile.pixels.clear(); // Clear pixel stats...
+
+    if (isFocusing) { // Draw border...
+        context.lineWidth = 3;
+        context.strokeStyle = "black";
+
+        context.strokeRect(
+            (startX - 1) * SIZE_MULT,
+            (startY - 1) * SIZE_MULT,
+            (endX - startX + 2) * SIZE_MULT,
+            (endY - startY + 2) * SIZE_MULT
+        );
+    }
+
+    // Render template...
+    for (var y = startY; y < endY; y++) {
+        for (var x = startX; x < endX; x++) {
+            const i = (y * TILE_SIZE + x) * 4;
+            const tr = tempPixels[i];
+            const tg = tempPixels[i + 1];
+            const tb = tempPixels[i + 2];
+            const tkey = `${tr}_${tg}_${tb}`;
+
+            const rr = realPixels[i];
+            const rg = realPixels[i + 1];
+            const rb = realPixels[i + 2];
+            const ra = realPixels[i + 3];
+            const rkey = `${rr}_${rg}_${rb}`;
+
+            const gx = x * SIZE_MULT;
+            const gy = y * SIZE_MULT;
+
+            const painted = ra !== 0;
+            const correct = rkey === tkey;
+            const active = colors.has(tkey);
+
+            if (isFocusing) {
+                context.clearRect(gx, gy, SIZE_MULT, SIZE_MULT);
+
+                const { rgb } = color.get(colors.values().next().value);
+                context.fillStyle = needsLightBg(rgb[0], rgb[1], rgb[2]) ? "white" : "rgb(60, 60, 60)";
+                context.fillRect(gx, gy, SIZE_MULT, SIZE_MULT);
+            }
+
+            // Fade color while focusing if active but already correctly painted.
+            if (active && correct && isFocusing) {
+                context.fillStyle = `rgba(${rr},${rg},${rb},0.5)`;
+                context.fillRect(gx, gy, 3, 3);
+            }
+
+            if (active && painted && !correct && isFocusing) {
+                context.fillStyle = `rgb(${rr},${rg},${rb})`;
+                context.fillRect(gx, gy, 3, 3);
+            }
+
+            // Render centered guide pixels.
+            if (active && !correct) {
+                context.fillStyle = `rgba(${tr},${tg},${tb},1)`;
+                context.fillRect(gx + 1, gy + 1, 1, 1);
+            }
+
+            // Stats...
+            let stats = tile.pixels.get(tkey);
+
+            if (!stats) {
+                stats = { painted: 0, mistake: 0 };
+                tile.pixels.set(tkey, stats);
+            }
+
+            if (painted && correct)
+                stats.painted += 1;
+
+            if (painted && !correct)
+                stats.mistake += 1;
+        }
+    }
+
+    return await canvas.convertToBlob({ type: "image/png" });
+};

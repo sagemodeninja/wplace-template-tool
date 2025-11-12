@@ -6,6 +6,7 @@ import { computePosition, offset, flip, shift } from "@floating-ui/dom";
 import { CommandMessage, Template, TemplateColor, Origin } from "@/structs";
 import { store } from "@/utils/storage";
 import { colors, numbers, messages, createTemplate } from "@/utils";
+import { SwitchButton } from "./switch";
 
 @customElement("tool-panel")
 export class ToolPanel extends LitElement {
@@ -89,7 +90,14 @@ export class ToolPanel extends LitElement {
                             <span>Pixel Count</span>
                         </div>
                     </div>
-                    ${repeat(this._template?.colors ?? [], c => c.id, this.renderTemplateColor.bind(this))}
+                    ${repeat(this._template?.colors.filter(c => c.count !== c.painted) ?? [], c => c.id, this.renderTemplateColor.bind(this))}
+                    <h3>Completed</h3>
+                    ${repeat(this._template?.colors.filter(c => c.count === c.painted) ?? [], c => c.id, this.renderTemplateColor.bind(this))}
+                </div>
+                <div>
+                    <switch-button id="toggle-background" @change=${this.toggleBackground}>
+                        Enable background
+                    </switch-button>
                 </div>
             </div>
         `;
@@ -148,6 +156,35 @@ export class ToolPanel extends LitElement {
             this._panel?.hidePopover();
     }
 
+    private toggleHoming() {
+        this._homing = !this._homing;
+
+        // Let the isolated script know...
+        messages.sendToIsolated<CommandMessage>("command", {
+            command: "toggle-homing",
+            data: this._homing
+        });
+    }
+
+    private async toggleAllColor() {
+        this._allColorsEnabled = !this._allColorsEnabled;
+        for (const color of this._template.colors) {
+            color.enabled = this._allColorsEnabled;
+        }
+        this.save();
+    }
+
+    private async toggleColor(color: TemplateColor, event: Event) {
+        event.stopPropagation();
+        color.enabled = !color.enabled;
+        this.save();
+    }
+
+    private toggleBackground(event: Event) {
+        const target = event.target as SwitchButton;
+        console.log("Toggle background: ", target.checked);
+    }
+
     private async positionMenu(e: ToggleEvent) {
         this._visible = e.newState === "open";
 
@@ -169,16 +206,6 @@ export class ToolPanel extends LitElement {
         });
     }
 
-    private toggleHoming() {
-        this._homing = !this._homing;
-
-        // Let the isolated script know...
-        messages.sendToIsolated<CommandMessage>("command", {
-            command: "toggle-homing",
-            data: this._homing
-        });
-    }
-
     private async uploadTemplate(e: Event) {
         const { files } = e.target as HTMLInputElement;
 
@@ -186,20 +213,6 @@ export class ToolPanel extends LitElement {
 
         // Update active template.
         this._template = await createTemplate(files[0], this._origin);
-        this.save();
-    }
-
-    private async toggleAllColor() {
-        this._allColorsEnabled = !this._allColorsEnabled;
-        for (const color of this._template.colors) {
-            color.enabled = this._allColorsEnabled;
-        }
-        this.save();
-    }
-
-    private async toggleColor(color: TemplateColor, event: Event) {
-        event.stopPropagation();
-        color.enabled = !color.enabled;
         this.save();
     }
 
@@ -245,11 +258,8 @@ export class ToolPanel extends LitElement {
                 </div>
                 <div class="tc-col px-cnt">
                     <span>
-                        ${numbers.toDecimal(color.painted)}
-                        /
-                        ${numbers.toDecimal(color.mistake)}
-                        /
-                        ${numbers.toDecimal(color.count)}
+                        ${numbers.toDecimal(color.count - color.painted)}
+                        ${color.mistake ? html`• <span style="color: red;">${numbers.toDecimal(color.mistake)}</span>` : nothing}
                     </span>
                 </div>
             </div>

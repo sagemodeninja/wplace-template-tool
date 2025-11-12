@@ -1,7 +1,6 @@
 // Responsible for intercepting fetch requests from client.
 
 import "@/components";
-import "../styles/index.scss";
 
 import { InterceptedBlobMessage } from "@/structs";
 import { store, messages } from "@/utils";

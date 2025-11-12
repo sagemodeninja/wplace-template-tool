@@ -1,8 +1,8 @@
-import { CommandMessage, InterceptedBlobMessage, InterceptedJsonMessage, Origin, Template, TemplateColor } from "./structs";
-import { image, messages, store } from "@/utils";
+import "../styles/index.scss";
 
-const TILE_SIZE = 1000;
-const SIZE_MULT = 3; // Scales each pixel into a 3x3 pixel grid.
+import { CommandMessage, InterceptedBlobMessage, InterceptedJsonMessage, Origin, Template, TemplateColor } from "./structs";
+import { messages, store } from "@/utils";
+import { overlay } from "@/utils/template";
 
 store.init(); // Allow storage API to work on both worlds (isolated/inline).
 
@@ -15,7 +15,7 @@ const inject = () => {
 
     // Styles
     const style = document.createElement("link");
-    style.href = chrome.runtime.getURL("styles.css");
+    style.href = chrome.runtime.getURL("static/styles/index.css");
     style.rel = "stylesheet";
     document.documentElement.appendChild(style);
 };
@@ -28,6 +28,8 @@ interface PixelStats {
 }
 
 interface StatefulTemplateTile {
+    tileX: number,
+    tileY: number,
     data: string,
     pixels: Map<string, PixelStats>, // <color, stats>
 }
@@ -35,7 +37,7 @@ interface StatefulTemplateTile {
 let isHoming = false;
 let isFocusing = false;
 let template: Template;
-let colorStatuses = new Set<string>();
+let colors = new Set<string>();
 let indexedColors = new Map<string, TemplateColor>();
 let tiles = new Map<string, StatefulTemplateTile>();
 
@@ -51,10 +53,13 @@ const updateTemplate = async () => {
 
     // Cache tiles...
     // FIXME: Complicated and perhaps inefficient!
-    tiles = new Map(Object.entries(template.tiles).map(([k, t]) => [k, { data: t, pixels: new Map() }]));
+    tiles = new Map(Object.entries(template.tiles).map(([k, t]) => {
+        const [tileX, tileY] = k.split("_").map(Number);
+        return [k, { tileX, tileY, data: t, pixels: new Map() }];
+    }));
 
     // Update color cache...
-    colorStatuses.clear();
+    colors.clear();
     indexedColors.clear();
 
     for (const color of template.colors) {
@@ -65,7 +70,7 @@ const updateTemplate = async () => {
 
         // Status
         if (color.enabled)
-            colorStatuses.add(color.key);
+            colors.add(color.key);
     }
 }
 
@@ -176,132 +181,13 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
     const [tileX, tileY] = paths.slice(-2).map(Number);
 
     // Configure...
-    const origin = template.bounds;
     const tileKey = `${tileX}_${tileY}`;
+    const tile = tiles.get(tileKey);
 
-    if (tiles.has(tileKey)) {
-        const bitmap = await createImageBitmap(blob);
-        const { width, height } = template.bounds;
-        const drawSize = TILE_SIZE * SIZE_MULT;
-
-        const canvas = new OffscreenCanvas(drawSize, drawSize);
-        const context = canvas.getContext("2d");
-
-        context.imageSmoothingEnabled = false; // Nearest neighbor
-
-        context.beginPath();
-        context.rect(0, 0, drawSize, drawSize);
-        context.clip();
-
-        // The real/original image.
-        const realCanvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
-        const realContext = realCanvas.getContext("2d", { willReadFrequently: true });
-
-        if (!realContext) return;
-
-        realContext.imageSmoothingEnabled = false; // Nearest neighbor
-
-        context.drawImage(bitmap, 0, 0, drawSize, drawSize);
-        realContext.drawImage(bitmap, 0, 0, TILE_SIZE, TILE_SIZE);
-        bitmap.close();
-
-        // TODO: Can be optimized!
-        const imageData = realContext.getImageData(0, 0, TILE_SIZE, TILE_SIZE);
-        const realPixels = imageData!.data!;
-
-        // The template image.
-        const tempCanvas = new OffscreenCanvas(TILE_SIZE, TILE_SIZE);
-        const tempContext = tempCanvas.getContext("2d", { willFrequentlyRead: true });
-
-        if (!tempContext) return;
-
-        tempContext.imageSmoothingEnabled = false; // Nearest neighbor
-
-        const tile = tiles.get(tileKey);
-        const img = await image.create(tile.data);
-
-        tempContext.drawImage(img, 0, 0);
-
-        const tempPixels = tempContext!.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
-
-        // Convert current tile's indices to global coords.
-        const gctx = tileX * TILE_SIZE;
-        const gcty = tileY * TILE_SIZE;
-
-        // Convert origin's tile indices to global coords.
-        const gotx = origin.tileX * TILE_SIZE;
-        const goty = origin.tileY * TILE_SIZE;
-
-        // Convert origin to global coordinates.
-        const gox = origin.offsetX + gotx;
-        const goy = origin.offsetY + goty;
-
-        // Offset start relative to tile.
-        const startX = Math.max(0, gox - gctx);
-        const startY = Math.max(0, goy - gcty);
-
-        // Offset end relative to tile.
-        const endX = Math.min(TILE_SIZE, gox + width - gctx);
-        const endY = Math.min(TILE_SIZE, goy + height - gcty);
-
-        tile.pixels.clear(); // Clear pixel stats...
-
-        // Render template...
-        for (var y = startY; y < endY; y++) {
-            for (var x = startX; x < endX; x++) {
-                const i = (y * TILE_SIZE + x) * 4;
-                const tr = tempPixels[i];
-                const tg = tempPixels[i + 1];
-                const tb = tempPixels[i + 2];
-                const tkey = `${tr}_${tg}_${tb}`;
-
-                const rr = realPixels[i];
-                const rg = realPixels[i + 1];
-                const rb = realPixels[i + 2];
-                const ra = realPixels[i + 3];
-                const rkey = `${rr}_${rg}_${rb}`;
-
-                const gx = x * SIZE_MULT;
-                const gy = y * SIZE_MULT;
-
-                const painted = ra !== 0;
-                const correct = rkey === tkey;
-                const active = colorStatuses.has(tkey);
-
-                if (isFocusing && (!active || correct))
-                    context.clearRect(gx, gy, 3, 3);
-
-                // Fade color while focusing if active but already correctly painted.
-                if (active && correct && isFocusing) {
-                    context.fillStyle = `rgba(${rr},${rg},${rb},0.2)`;
-                    context.fillRect(gx, gy, 3, 3);
-                }
-
-                // Render centered guide pixels.
-                if (active && !correct) {
-                    context.fillStyle = `rgba(${tr},${tg},${tb},1)`;
-                    context.fillRect(gx + 1, gy + 1, 1, 1);
-                }
-
-                // Stats...
-                let stats = tile.pixels.get(tkey);
-
-                if (!stats) {
-                    stats = { painted: 0, mistake: 0 };
-                    tile.pixels.set(tkey, stats);
-                }
-
-                if (painted && correct)
-                    stats.painted += 1;
-
-                if (painted && !correct)
-                    stats.mistake += 1;
-            }
-        }
+    if (tile) {
+        const overlayed = await overlay(template, blob, tile, colors, isFocusing);
 
         updateColorStats();
-
-        const b = await canvas.convertToBlob({ type: "image/png" });
 
         console.log("Processed tile ", tileKey);
 
@@ -309,7 +195,7 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
             endpoint,
             processed: true,
             blobId,
-            blob: b,
+            blob: overlayed,
         });
     }
 

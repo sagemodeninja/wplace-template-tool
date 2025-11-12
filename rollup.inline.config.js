@@ -2,7 +2,7 @@ import alias from "@rollup/plugin-alias";
 import replace from "@rollup/plugin-replace";
 import resolve from "@rollup/plugin-node-resolve";
 import typescript from "@rollup/plugin-typescript";
-import scss from "rollup-plugin-scss";
+import { litScss } from "rollup-plugin-scss-lit";
 import terser from "@rollup/plugin-terser";
 
 export default {
@@ -11,7 +11,6 @@ export default {
         dir: "dist",
         format: "iife",
         inlineDynamicImports: true,
-        assetFileNames: "[name][extname]"
     },
     plugins: [
         alias({
@@ -26,11 +25,10 @@ export default {
         resolve({
             extensions: [".js", ".ts"]
         }),
-        typescript(),
-        scss({
-            output: "dist/styles/",
-            fileName: "styles.css"
+        litScss({
+            include: ["scripts/**/*.scss"]
         }),
+        typescript(),
         terser()
     ],
 };

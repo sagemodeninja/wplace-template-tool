@@ -1,0 +1,35 @@
+:host {
+    --size: 18px;
+    --spacing: 3px;
+
+    align-items: center;
+    display: flex;
+    gap: 8px;
+
+    #control {
+        align-items: center;
+        box-shadow: inset 0 0 0 2px #000;
+        border-radius: calc(var(--size) / 2);
+        display: flex;
+        height: var(--size);
+        justify-content: start;
+        padding: var(--spacing);
+        width: 32px;
+
+        &::before {
+            $size: calc(var(--size) - (var(--spacing) * 2));
+
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: inset 0 0 0 2px #000;
+            content: "";
+            display: block;
+            height: $size;
+            width: $size;
+        }
+    }
+}
+
+:host([checked]) #control {
+    justify-content: end;
+}
