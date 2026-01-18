@@ -1,18 +1,23 @@
 :host {
-    --size: 18px;
+    --size: 20px;
     --spacing: 3px;
 
     align-items: center;
+    color: hsl(214deg 30% 32%);
     display: flex;
     gap: 8px;
 
     #control {
         align-items: center;
-        box-shadow: inset 0 0 0 2px #000;
+        background-color: #fff;
+        background-image: none, var(--fx-noise);
+        border: solid 2px hsl(215deg 26% 85%);
         border-radius: calc(var(--size) / 2);
+        box-sizing: border-box;
+        cursor: pointer;
         display: flex;
         height: var(--size);
-        justify-content: start;
+        position: relative;
         padding: var(--spacing);
         width: 32px;
 
@@ -20,16 +25,23 @@
             $size: calc(var(--size) - (var(--spacing) * 2));
 
             background-color: #fff;
-            border-radius: 5px;
-            box-shadow: inset 0 0 0 2px #000;
+            border: solid 2px hsl(215deg 26% 85%);
+            background-image: none, var(--fx-noise);
+            border-radius: 50%;
+            box-sizing: border-box;
             content: "";
             display: block;
             height: $size;
+            transition: transform 0.2s ease-in-out;
             width: $size;
         }
     }
 }
 
 :host([checked]) #control {
-    justify-content: end;
+    &::before {
+        background-color: var(--color-primary);
+        border: solid 2px hsl(216deg 100% 48%);
+        transform: translateX(calc(100% - var(--spacing) * 2));
+    }
 }

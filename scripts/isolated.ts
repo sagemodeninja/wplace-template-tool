@@ -2,13 +2,16 @@ import "../styles/index.scss";
 
 import {
     CommandMessage,
+    defaultValues,
     InterceptedBlobMessage,
     InterceptedJsonMessage,
+    IToolSettings,
     Origin,
     Template,
     TemplateColor,
 } from "./structs";
 import { messages, store } from "@/utils";
+import { settings } from "@/utils/settings";
 import { overlay } from "@/utils/template";
 
 store.init(); // Allow storage API to work on both worlds (isolated/inline).
@@ -48,8 +51,13 @@ let colors = new Set<string>();
 let indexedColors = new Map<string, TemplateColor>();
 let tiles = new Map<string, StatefulTemplateTile>();
 
+const state = {
+    settings: defaultValues,
+};
+
 (async () => {
     isFocusing = await store.get("focus-enabled");
+    state.settings = await settings.load();
 })();
 
 // Fetch templates...
@@ -118,16 +126,19 @@ const updateColorStats = async () => {
     }, 200);
 };
 
-const handleCommands = (message: CommandMessage) => {
-    switch (message.command) {
+const handleCommands = ({ command, data }: CommandMessage) => {
+    switch (command) {
         case "toggle-homing":
-            isHoming = message.data;
+            isHoming = data;
             break;
         case "toggle-focus":
-            isFocusing = message.data;
+            isFocusing = data;
             break;
         case "update-template":
             updateTemplate();
+            break;
+        case "update-settings":
+            state.settings = data;
             break;
     }
 };
@@ -154,7 +165,7 @@ const handleInterceptedJson = async (message: InterceptedJsonMessage) => {
             const offsetY = parseInt(coords.get("y")?.toString()!);
 
             const origin = { tileX, tileY, offsetX, offsetY } as Origin;
-            store.set("origin", origin);
+            await settings.update({ origin });
 
             return messages.sendToInline<CommandMessage>("command", {
                 command: "set-origin",
@@ -192,7 +203,7 @@ const handleInterceptedBlob = async (message: InterceptedBlobMessage) => {
     const tile = tiles.get(tileKey);
 
     if (tile) {
-        const overlayed = await overlay(template, blob, tile, colors, isFocusing);
+        const overlayed = await overlay(state.settings, template, blob, tile, colors, isFocusing);
 
         updateColorStats();
 

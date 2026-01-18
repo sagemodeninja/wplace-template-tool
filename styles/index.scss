@@ -59,6 +59,17 @@ tool-panel {
                 }
             }
         }
+
+        #bg-section {
+            align-self: center;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+
+            .btn {
+                color: hsl(214deg 30% 32%);
+            }
+        }
     }
 }
 

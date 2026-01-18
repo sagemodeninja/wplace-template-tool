@@ -1,6 +1,6 @@
 // Responsible for managing templates.
 
-import { Origin, TemplateBounds, Template, TemplateColor } from "@/structs";
+import { Origin, TemplateBounds, Template, TemplateColor, IToolSettings } from "@/structs";
 import { color } from "@/utils/colors";
 import { image } from "@/utils/image";
 import { file as files } from "@/utils/file";
@@ -14,10 +14,10 @@ interface PixelStats {
 }
 
 interface StatefulTemplateTile {
-    tileX: number,
-    tileY: number,
-    data: string,
-    pixels: Map<string, PixelStats>, // <color, stats>
+    tileX: number;
+    tileY: number;
+    data: string;
+    pixels: Map<string, PixelStats>; // <color, stats>
 }
 
 export const createTemplate = async (file: File, origin: Origin) => {
@@ -74,14 +74,17 @@ export const createTemplate = async (file: File, origin: Origin) => {
 
     const colors = [...unsorted.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([key, count]) => ({
-            id: color.indexOf(key),
-            key,
-            count,
-            painted: 0,
-            mistake: 0,
-            enabled: true,
-        }) as TemplateColor);
+        .map(
+            ([key, count]) =>
+                ({
+                    id: color.indexOf(key),
+                    key,
+                    count,
+                    painted: 0,
+                    mistake: 0,
+                    enabled: true,
+                }) as TemplateColor
+        );
 
     // Construct template...
     const template = {
@@ -93,17 +96,19 @@ export const createTemplate = async (file: File, origin: Origin) => {
     } as Template;
 
     return template;
-}
-
-const needsLightBg = (r: number, g: number, b: number) => {
-    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b; // sRGB weighted
-    return luminance < 128;
 };
 
 /**
  * Overlay a template to a tile.
  */
-export const overlay = async (template: Template, blob: Blob, tile: StatefulTemplateTile, colors: Set<string>, isFocusing: boolean) => {
+export const overlay = async (
+    settings: IToolSettings,
+    template: Template,
+    blob: Blob,
+    tile: StatefulTemplateTile,
+    colors: Set<string>,
+    isFocusing: boolean
+) => {
     const origin = template.bounds;
 
     const bitmap = await createImageBitmap(blob);
@@ -171,17 +176,7 @@ export const overlay = async (template: Template, blob: Blob, tile: StatefulTemp
 
     tile.pixels.clear(); // Clear pixel stats...
 
-    if (isFocusing) { // Draw border...
-        context.lineWidth = 3;
-        context.strokeStyle = "black";
-
-        context.strokeRect(
-            (startX - 1) * SIZE_MULT,
-            (startY - 1) * SIZE_MULT,
-            (endX - startX + 2) * SIZE_MULT,
-            (endY - startY + 2) * SIZE_MULT
-        );
-    }
+    context.clearRect(startX * SIZE_MULT, startY * SIZE_MULT, (endX - startX) * SIZE_MULT, (endY - startY) * SIZE_MULT);
 
     // Render template...
     for (var y = startY; y < endY; y++) {
@@ -202,14 +197,16 @@ export const overlay = async (template: Template, blob: Blob, tile: StatefulTemp
             const gy = y * SIZE_MULT;
 
             const painted = ra !== 0;
-            const correct = rkey === tkey;
+            const correct = painted && rkey === tkey;
             const active = colors.has(tkey);
 
-            if (isFocusing) {
-                context.clearRect(gx, gy, SIZE_MULT, SIZE_MULT);
+            if (settings.enableBackground) {
+                context.fillStyle = settings.backgroundMode === "light" ? "white" : "rgb(60, 60, 60)";
+                context.fillRect(gx, gy, SIZE_MULT, SIZE_MULT);
+            }
 
-                const { rgb } = color.get(colors.values().next().value);
-                context.fillStyle = needsLightBg(rgb[0], rgb[1], rgb[2]) ? "white" : "rgb(60, 60, 60)";
+            if (painted && !isFocusing) {
+                context.fillStyle = `rgb(${rr},${rg},${rb})`;
                 context.fillRect(gx, gy, SIZE_MULT, SIZE_MULT);
             }
 
@@ -221,7 +218,7 @@ export const overlay = async (template: Template, blob: Blob, tile: StatefulTemp
 
             if (active && painted && !correct && isFocusing) {
                 context.fillStyle = `rgb(${rr},${rg},${rb})`;
-                context.fillRect(gx, gy, 3, 3);
+                context.fillRect(gx, gy, SIZE_MULT, SIZE_MULT);
             }
 
             // Render centered guide pixels.
@@ -238,11 +235,9 @@ export const overlay = async (template: Template, blob: Blob, tile: StatefulTemp
                 tile.pixels.set(tkey, stats);
             }
 
-            if (painted && correct)
-                stats.painted += 1;
+            if (correct) stats.painted += 1;
 
-            if (painted && !correct)
-                stats.mistake += 1;
+            if (painted && !correct) stats.mistake += 1;
         }
     }
 

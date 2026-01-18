@@ -5,3 +5,4 @@ export * from "./messages";
 export * from "./storage";
 export * from "./file";
 export * from "./template";
+export * from "./settings";
